@@ -1,4 +1,4 @@
-package horde
+package hoard
 
 import (
 	"io"
@@ -206,7 +206,7 @@ func checkLastModified(w http.ResponseWriter, r *http.Request, modtime time.Time
 }
 
 
-func (hh HordeHandler) ServeContent(w http.ResponseWriter, r *http.Request, name string, modtime time.Time, content io.ReadSeeker) {
+func (hh HoardHandler) ServeContent(w http.ResponseWriter, r *http.Request, name string, modtime time.Time, content io.ReadSeeker) {
 	sizeFunc := func() (int64, error) {
 		size, err := content.Seek(0, os.SEEK_END)
 		if err != nil {

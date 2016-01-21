@@ -1,4 +1,4 @@
-package horde
+package hoard
 
 import (
 	"html/template"
@@ -8,13 +8,12 @@ import (
 var (
 	tMap = template.FuncMap{ "hoard": tFunction }
 	nameToHash = map[string]string{}
-	hashToName = map[string]string{}
-	hoards = map[string]*HordeHandler{}
+	hoards = map[string]*HoardHandler{}
 )
 
 
-func addHoard(hh HordeHandler) {
-	hoards[hh.Prefix] = &hh
+func addHoard(hh *HoardHandler) {
+	hoards[hh.Prefix] = hh
 }
 
 func tFunction(in string) string {

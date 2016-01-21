@@ -1,4 +1,4 @@
-package horde
+package hoard
 
 import (
 	"bytes"
@@ -20,7 +20,7 @@ import (
 
 
 type FileBuffer struct {
-	parent *HordeHandler
+	parent *HoardHandler
 	buf []byte
 }
 
@@ -59,7 +59,7 @@ func (fb *FileBuffer) Get() (*bytes.Reader, int) {
 //
 // A place for your dragon to store his treasures
 //
-type HordeHandler struct {
+type HoardHandler struct {
 	Prefix  string
 	Dir     http.Dir
 	M       *minify.M
@@ -71,7 +71,7 @@ type HordeHandler struct {
 //
 // Serve HTTP function to make it a handler interface
 //
-func (hh HordeHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (hh HoardHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Remove the leading prefix
 	urlPath := r.URL.Path[len(hh.Prefix):]
 
@@ -101,7 +101,7 @@ func (hh HordeHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 
 //
-// Set the location of a horde and register a handler with http module
+// Set the location of a hoard and register a handler with http module
 //
 func Create(prefix string, dir http.Dir, compress []string) {
 	// Configure Minifier
@@ -114,7 +114,7 @@ func Create(prefix string, dir http.Dir, compress []string) {
 		}
 	}
 
-	hh := HordeHandler{
+	hh := HoardHandler{
 		Prefix:  prefix,
 		Dir:     dir,
 		M:       m,
@@ -122,7 +122,7 @@ func Create(prefix string, dir http.Dir, compress []string) {
 		Stashed: make(map[string]*FileBuffer),
 	}
 
-	addHoard(hh)
+	addHoard(&hh)
 	http.Handle(prefix, hh)
 }
 
@@ -138,14 +138,14 @@ func preload(filePath string) string {
 		}
 	}
 
-	return ""
+	return filePath
 }
 
 
 //
 // Add a resource to a hoard, or get its name if it already exists, returns the name
 //
-func addResource(name string, hh *HordeHandler) string {
+func addResource(name string, hh *HoardHandler) string {
 	// Try to get the resource from the stash
 	if _, ok := hh.Stashed[name]; ok {
 		// It is already in the stash, return the hash for accessing it
@@ -168,6 +168,8 @@ func addResource(name string, hh *HordeHandler) string {
 		// Finally save to stash with both the real name and hashed name
 		hh.Stashed[name] = fb
 		hh.Stashed[hash] = fb
+
+		nameToHash[name] = hh.Prefix + hash
 		return hh.Prefix + hash
 	}
 }
