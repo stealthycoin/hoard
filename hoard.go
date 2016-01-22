@@ -13,6 +13,7 @@ import (
 	"strings"
 	"errors"
 	"crypto/md5"
+	"html/template"
 
 	"github.com/tdewolff/minify"
 	"github.com/tdewolff/minify/css"
@@ -183,7 +184,7 @@ func addResource(name string, hh *HoardHandler) string {
 //
 // Add a block of resources
 //
-func multiLoad(names []string) (string, error) {
+func multiLoad(names []string) (template.HTML, error) {
 	readers := make([]io.Reader, 0)
 	ctype := ""
 	ext := ""
@@ -201,8 +202,9 @@ func multiLoad(names []string) (string, error) {
 				} else {
 					ctype = temp
 				}
-				file, err := h.Dir.Open(name)
+				file, err := h.Dir.Open(name[len(hh.Prefix):])
 				if err != nil {
+					log.Println(err)
 					return "", err
 				}
 
@@ -222,6 +224,12 @@ func multiLoad(names []string) (string, error) {
 	// Save under hash only since this isnt a single file
 	hh.Stashed[hash] = fb
 
-	// Return the name
-	return hh.Prefix + hash, nil
+	// Need to surround it in its tag
+	result := hh.Prefix + hash
+	if ext == ".css" {
+		result = "<link rel=\"stylesheet\" type=\"text/css\" media=\"screen\" href=\"" + result + "\" />"
+	} else if ext == ".js" {
+		result = "<script type=\"text/javascript\" src=\"" + result + "\"></script>"
+	}
+	return template.HTML(result), nil
 }

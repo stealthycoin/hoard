@@ -1,6 +1,7 @@
 package hoard
 
 import (
+	"log"
 	"html/template"
 )
 
@@ -24,7 +25,7 @@ func singleResource(in string) string {
 	return preload(in)
 }
 
-func blockResources(in []string) (string, error) {
+func blockResources(in ...string) (template.HTML, error) {
 	// Load a block of resources into a single file
 	return multiLoad(in)
 }
