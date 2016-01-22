@@ -8,7 +8,6 @@ _	"log"
 	"time"
 	"mime"
 	_	"bytes"
-	"bufio"
 	"errors"
 	"strconv"
 	"strings"
@@ -325,31 +324,16 @@ func (hh HoardHandler) ServeContent(w http.ResponseWriter, r *http.Request, name
 			}()
 		}
 
-		// Cache it if it isnt already
-		if _, ok := hh.Stashed[name]; !ok {
-			hh.Stashed[name] = &FileBuffer{
-				parent: &hh,
-				buf: make([]byte, 0),
-			}
-			hh.Stashed[name].Set(sendContent, ctype)
-
+		w.Header().Set("Accept-Ranges", "bytes")
+		if w.Header().Get("Content-Encoding") == "" {
+			w.Header().Set("Content-Length", strconv.FormatInt(sendSize, 10))
 		}
-	}
-
-	// New buffer for content since it may have been minified by the caching
-	buf, bsize := hh.Stashed[name].Get()
-	sendSize = int64(bsize)
-
-
-	w.Header().Set("Accept-Ranges", "bytes")
-	if w.Header().Get("Content-Encoding") == "" {
-		w.Header().Set("Content-Length", strconv.FormatInt(sendSize, 10))
 	}
 
 
 	w.WriteHeader(code)
 
 	if r.Method != "HEAD" {
-		io.Copy(w, bufio.NewReader(buf))
+		io.CopyN(w, sendContent, sendSize)
 	}
 }

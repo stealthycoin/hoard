@@ -11,6 +11,7 @@ import (
 	"mime"
 	"net/http"
 	"strings"
+	"errors"
 	"crypto/md5"
 
 	"github.com/tdewolff/minify"
@@ -89,14 +90,15 @@ func (hh HoardHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	//Serve content from the file or from the cache
-	if fb, ok := hh.Stashed[urlPath]; ok {
-		// Serve from cached map
-		content, _ := fb.Get()
-		hh.ServeContent(w, r, urlPath, modTime, content)
-	} else {
-		// Serve the content from the file
-		hh.ServeContent(w, r, urlPath, modTime, file)
+	if _, ok := hh.Stashed[urlPath]; !ok {
+		// Add the file
+		addResource(urlPath, &hh)
 	}
+
+	// Serve from cached map
+	fb, _ := hh.Stashed[urlPath]
+	content, _ := fb.Get()
+	hh.ServeContent(w, r, urlPath, modTime, content)
 }
 
 
@@ -149,8 +151,10 @@ func addResource(name string, hh *HoardHandler) string {
 	// Try to get the resource from the stash
 	if _, ok := hh.Stashed[name]; ok {
 		// It is already in the stash, return the hash for accessing it
+		log.Println("Already in hoard")
 		return nameToHash[name]
 	} else {
+		log.Println("Adding to hoard")
 		// Not in the stash, add it now since it will be requested once this page loads
 		file, err := hh.Dir.Open(name)
 		if err != nil {
@@ -170,6 +174,54 @@ func addResource(name string, hh *HoardHandler) string {
 		hh.Stashed[hash] = fb
 
 		nameToHash[name] = hh.Prefix + hash
+		log.Println(hh.Prefix + hash)
 		return hh.Prefix + hash
 	}
+}
+
+
+//
+// Add a block of resources
+//
+func multiLoad(names []string) (string, error) {
+	readers := make([]io.Reader, 0)
+	ctype := ""
+	ext := ""
+	var hh *HoardHandler
+	// Go through each name
+	for _, name := range names {
+		// Find hoard it should belong to
+		for key, h := range hoards {
+			if strings.HasPrefix(name, key) {
+				hh = h
+				ext = path.Ext(name)
+				temp := mime.TypeByExtension(ext)
+				if temp != ctype && ctype != "" {
+					return "", errors.New("Mismatched mimetype in hoard_bundle")
+				} else {
+					ctype = temp
+				}
+				file, err := h.Dir.Open(name)
+				if err != nil {
+					return "", err
+				}
+
+				readers = append(readers, file)
+			}
+		}
+	}
+
+	// Read file(s) and get hash of contents
+	fb := &FileBuffer{
+		parent: hh,
+		buf: make([]byte, 0),
+	}
+	fb.Set(io.MultiReader(readers...), ctype)
+	hash := fmt.Sprintf("%x%s", md5.Sum(fb.buf), ext)
+
+	// Save under hash only since this isnt a single file
+	hh.Stashed[hash] = fb
+
+	// Return the name
+	return hh.Prefix + hash, nil
 }
