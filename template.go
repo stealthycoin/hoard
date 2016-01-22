@@ -1,7 +1,6 @@
 package hoard
 
 import (
-	"log"
 	"html/template"
 )
 
