@@ -22,8 +22,11 @@ import (
 
 
 type FileBuffer struct {
-	parent *HoardHandler
-	buf []byte
+	parent *HoardHandler // Handler responsiblef for this buffer
+
+	// Only one of the following should be set
+	buf    []byte        // This filebuffer has its own content
+	deps   []*FileBuffer // This filebuffer is a collection of other filebuffers
 }
 
 func (fb *FileBuffer) Set(r io.Reader, ctype string) {
@@ -51,8 +54,24 @@ func (fb *FileBuffer) Set(r io.Reader, ctype string) {
 }
 
 
-// Return a new reader to the file
-func (fb *FileBuffer) Get() (*bytes.Reader, int) {
+// Return a new reader to the buffer content
+func (fb *FileBuffer) Get() (io.ReadSeeker, int) {
+	if fb.deps != nil {
+		// Dependant file buffer with no real content of its own
+		// Collect readers from all dependencides in order
+		readers := make([]io.ReadSeeker, 0)
+		tot_len := 0
+		for _, dep := range fb.deps {
+			reader, length := dep.Get()
+			readers = append(readers, reader)
+			tot_len += length
+		}
+
+		// Build a multireader from the readers
+		return MultiReadSeeker(readers...), tot_len
+	}
+
+	// Otherwise read out the data from the buffer
 	reader := bytes.NewReader(fb.buf)
 	return reader, len(fb.buf)
 }
@@ -67,6 +86,14 @@ type HoardHandler struct {
 	M       *minify.M
 	Types   []string
 	Stashed map[string]*FileBuffer
+}
+
+
+//
+// Remove the shared prefix of a particular hoard
+//
+func (hh *HoardHandler) RemovePrefix(in string) string {
+	return in[len(hh.Prefix):]
 }
 
 
@@ -92,7 +119,7 @@ func (hh HoardHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	//Serve content from the file or from the cache
 	if _, ok := hh.Stashed[urlPath]; !ok {
-		// Add the file
+		// Add the file if its not found
 		addResource(urlPath, &hh)
 	}
 
@@ -152,10 +179,8 @@ func addResource(name string, hh *HoardHandler) string {
 	// Try to get the resource from the stash
 	if _, ok := hh.Stashed[name]; ok {
 		// It is already in the stash, return the hash for accessing it
-		log.Println("Already in hoard")
 		return nameToHash[name]
 	} else {
-		log.Println("Adding to hoard")
 		// Not in the stash, add it now since it will be requested once this page loads
 		file, err := hh.Dir.Open(name)
 		if err != nil {
@@ -165,7 +190,8 @@ func addResource(name string, hh *HoardHandler) string {
 		// Read file and get hash of contents
 		fb := &FileBuffer{
 			parent: hh,
-			buf: make([]byte, 0),
+			buf:    make([]byte, 0),
+			deps:   nil,
 		}
 		fb.Set(file, mime.TypeByExtension(path.Ext(name)))
 		hash := fmt.Sprintf("%x%s", md5.Sum(fb.buf), path.Ext(name))
@@ -175,7 +201,6 @@ func addResource(name string, hh *HoardHandler) string {
 		hh.Stashed[hash] = fb
 
 		nameToHash[name] = hh.Prefix + hash
-		log.Println(hh.Prefix + hash)
 		return hh.Prefix + hash
 	}
 }
@@ -185,41 +210,72 @@ func addResource(name string, hh *HoardHandler) string {
 // Add a block of resources
 //
 func multiLoad(names []string) (template.HTML, error) {
-	readers := make([]io.Reader, 0)
+	// Verify we have multiple files
+	if len(names) == 0 {
+		return "", errors.New("hoard_bundle tag with no filenames.")
+	} else if len(names) == 1 {
+		return "", errors.New("hoard_bundle tag with 1 file. Use the haord tag instead.")
+	}
+
+	// Housekeeping
+	buffers := make([]*FileBuffer, 0)
 	ctype := ""
 	ext := ""
 	var hh *HoardHandler
+
+	// Find hoard this block belongs to using the first filename
+	for key, h := range hoards {
+		if strings.HasPrefix(names[0], key) {
+			hh = h
+		}
+	}
+
+
+	// Concat names and get MD5
+	longName := strings.Join(names, "")
+	hash := fmt.Sprintf("%x%s", md5.Sum([]byte(longName)), path.Ext(names[0]))
+
+	// Check for existing hash, if it exists return early
+	if _, ok := hh.Stashed[hash]; ok {
+		if ext == ".css" {
+			return wrapCSS(hash), nil
+		} else if ext == ".js" {
+			return wrapJS(hash), nil
+		}
+	}
+
+	// It doesn't exist, we need to collect all the files and mark them as dependencies
 	// Go through each name
 	for _, name := range names {
 		// Find hoard it should belong to
-		for key, h := range hoards {
-			if strings.HasPrefix(name, key) {
-				hh = h
-				ext = path.Ext(name)
-				temp := mime.TypeByExtension(ext)
-				if temp != ctype && ctype != "" {
-					return "", errors.New("Mismatched mimetype in hoard_bundle")
-				} else {
-					ctype = temp
-				}
-				file, err := h.Dir.Open(name[len(hh.Prefix):])
-				if err != nil {
-					log.Println(err)
-					return "", err
-				}
+		ext = path.Ext(name)
+		temp := mime.TypeByExtension(ext)
 
-				readers = append(readers, file)
-			}
+		// Verify it matches previous filetypes
+		if temp != ctype && ctype != "" {
+			return "", errors.New("Mismatched mimetype in hoard_bundle")
+		} else {
+			ctype = temp
+		}
+
+		// Get the hash of this dependency (load it if unloaded)
+		dep_hash := addResource(hh.RemovePrefix(name), hh)
+
+		// Add it to the list of dependencies
+		if new_dep, ok := hh.Stashed[hh.RemovePrefix(dep_hash)]; ok {
+			buffers = append(buffers, new_dep)
+		} else {
+			log.Println("Failed to load dependency", dep_hash)
 		}
 	}
 
 	// Read file(s) and get hash of contents
 	fb := &FileBuffer{
 		parent: hh,
-		buf: make([]byte, 0),
+		buf:    nil,
+		deps:   buffers,
 	}
-	fb.Set(io.MultiReader(readers...), ctype)
-	hash := fmt.Sprintf("%x%s", md5.Sum(fb.buf), ext)
+
 
 	// Save under hash only since this isnt a single file
 	hh.Stashed[hash] = fb
@@ -227,9 +283,10 @@ func multiLoad(names []string) (template.HTML, error) {
 	// Need to surround it in its tag
 	result := hh.Prefix + hash
 	if ext == ".css" {
-		result = "<link rel=\"stylesheet\" type=\"text/css\" media=\"screen\" href=\"" + result + "\" />"
+		return wrapCSS(result), nil
 	} else if ext == ".js" {
-		result = "<script type=\"text/javascript\" src=\"" + result + "\"></script>"
+		return wrapJS(result), nil
 	}
+
 	return template.HTML(result), nil
 }
