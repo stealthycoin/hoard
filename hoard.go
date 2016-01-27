@@ -3,6 +3,7 @@ package hoard
 import (
 	"bytes"
 	"io"
+	"os"
 	"io/ioutil"
 	"log"
 	"fmt"
@@ -23,6 +24,7 @@ import (
 
 type FileBuffer struct {
 	parent *HoardHandler // Handler responsiblef for this buffer
+	mod    int64         // Last modification time
 
 	// Only one of the following should be set
 	buf    []byte        // This filebuffer has its own content
@@ -177,7 +179,21 @@ func preload(filePath string) string {
 //
 func addResource(name string, hh *HoardHandler) string {
 	// Try to get the resource from the stash
-	if _, ok := hh.Stashed[name]; ok {
+	if fb, ok := hh.Stashed[name]; ok {
+		// Check if the file has been modified since last time
+		info, _ := os.Stat(path.Join(string(hh.Dir), name))
+		last_mod := info.ModTime().Unix()
+
+		if last_mod > hh.Stashed[name].mod {
+			file, _ := hh.Dir.Open(name)
+			fb.Set(file, mime.TypeByExtension(path.Ext(name)))
+			hash := fmt.Sprintf("%x%s", md5.Sum(fb.buf), path.Ext(name))
+			hh.Stashed[name] = fb
+			hh.Stashed[hash] = fb
+			nameToHash[name] = hh.Prefix + hash
+			return hh.Prefix + hash
+		}
+
 		// It is already in the stash, return the hash for accessing it
 		return nameToHash[name]
 	} else {
@@ -187,9 +203,12 @@ func addResource(name string, hh *HoardHandler) string {
 			log.Println("Cannot find resource: ", name)
 		}
 
+		stat, _ := file.Stat()
+
 		// Read file and get hash of contents
 		fb := &FileBuffer{
 			parent: hh,
+			mod:    stat.ModTime().Unix(),
 			buf:    make([]byte, 0),
 			deps:   nil,
 		}
@@ -269,9 +288,10 @@ func multiLoad(names []string) (template.HTML, error) {
 		}
 	}
 
-	// Read file(s) and get hash of contents
+	// Create a buffer with dependencies
 	fb := &FileBuffer{
 		parent: hh,
+		mod:    0,
 		buf:    nil,
 		deps:   buffers,
 	}
