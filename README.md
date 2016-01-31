@@ -19,4 +19,4 @@ Second argument is a directory to load files from
 Third argument is a list of media types to compress
 
 
-Hoard will now serve files such as ```website.com/static/js/main.js``` from the static directory
+Hoard will now serve files such as ```website.com/static/js/main.js``` from the ```static``` directory.
