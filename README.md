@@ -26,3 +26,7 @@ Hoard will now serve files such as ```website.com/static/js/main.js``` from the 
 ```
 <link rel="stylesheet" type="text/css" media="screen" href="{{ hoard "/static/css/main.css" }}" />
 ```
+
+```
+<script type="text/javascript" src="{{ hoard "/static/js/main.js" }}"></script>
+```
