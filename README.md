@@ -1,5 +1,5 @@
 # Hoard
-Golang static file server and cache library.
+Golang static file server and cache library. I wrote hoard in an effort to improve load times at [kingstafl](http://kingstafl.com) I could not find a library that did all the things I wanted. Granted I only looked for a few minutes.
 
 Hoard can be used to serve/compress/cache static files as well as serve groups of files as a single file.
 
