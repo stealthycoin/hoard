@@ -1,4 +1,6 @@
 # hoard
-Golang cache thingy
+Golang static file server and cache library.
 
-I may or may not have misused horde a bunch of places instead of hoard...
+
+## Usage
+Test
