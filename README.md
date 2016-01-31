@@ -36,3 +36,5 @@ Hoard will now serve files such as ```website.com/static/js/main.js``` from the 
 ```
 {{ hoard_bundle "/static/js/main.js" "/static/js/pageone.js" "/static/js/secondary.js" }}
 ```
+
+Hoard will load these three files sequentially together into one and compress them (if it's set to) and return them as a single file. This will decrease the number of files the browser needs to request. Hoard also caches all files.
