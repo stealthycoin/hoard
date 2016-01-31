@@ -1,7 +1,7 @@
 # Hoard
 Golang static file server and cache library.
 
-Hoard can be used to serve/compress/cache static files as well as serve groups of files as a single file. It will also wrap it in either a js script tag or link tag for css. If the file extensions do no't match it will throw an error. If the files are not css or js just the filename will be returned.
+Hoard can be used to serve/compress/cache static files as well as serve groups of files as a single file.
 
 
 ## Usage
@@ -39,4 +39,4 @@ Hoard will now serve files such as ```website.com/static/js/main.js``` from the 
 {{ hoard_bundle "/static/js/main.js" "/static/js/pageone.js" "/static/js/secondary.js" }}
 ```
 
-Hoard will load these three files sequentially together into one and compress them (if it's set to) and return them as a single file. This will decrease the number of files the browser needs to request. Hoard also caches all files.
+Hoard will load these three files sequentially together into one and compress them (if it's set to) and return them as a single file. This will decrease the number of files the browser needs to request. Hoard also caches all files. It will also wrap it in either a js script tag or link tag for css. If the file extensions do no't match it will throw an error. If the files are not css or js just the filename will be returned.
