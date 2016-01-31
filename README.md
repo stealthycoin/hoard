@@ -3,4 +3,6 @@ Golang static file server and cache library.
 
 
 ## Usage
-Test
+```
+import "github.com/stealthycoin/hoard"
+```
