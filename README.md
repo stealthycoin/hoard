@@ -18,3 +18,11 @@ Third argument is a list of media types to compress
 
 
 Hoard will now serve files such as ```website.com/static/js/main.js``` from the ```static``` directory.
+
+## Template Usage
+
+#### Load a single file
+
+```
+<link rel="stylesheet" type="text/css" media="screen" href="{{ hoard "/static/css/main.css" }}" />
+```
