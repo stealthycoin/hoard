@@ -30,3 +30,9 @@ Hoard will now serve files such as ```website.com/static/js/main.js``` from the 
 ```
 <script type="text/javascript" src="{{ hoard "/static/js/main.js" }}"></script>
 ```
+
+#### Load multiple files at once
+
+```
+{{ hoard_bundle "/static/js/main.js" "/static/js/pageone.js" "/static/js/secondary.js" }}
+```
