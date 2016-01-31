@@ -1,5 +1,7 @@
-# hoard
+# Hoard
 Golang static file server and cache library.
+
+Hoard can be used to serve/compress/cache static files as well as serve groups of files as a single file.
 
 
 ## Usage
